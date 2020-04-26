@@ -4,6 +4,7 @@ import struct
 import subprocess
 import shlex
 import binascii
+import netifaces
 
 class EthPacket(object):
     def __init__(self, dmac, smac, ethtype, payload):
@@ -23,7 +24,7 @@ class ArpPacket(object):
         self.smac = smac
         self.sip = sip
         self.dmac = dmac
-        self.dip = dip
+        self.dip = dip(
 
 
 class IpPacket(object):
@@ -48,6 +49,9 @@ def parse_raw_mac_addr(raw_mac_addr: bytes) -> str:
             mac += str(raw_mac_addr[i] & 0xFF) + ":"
         i += 1
     return mac
+
+def getmacddr():
+    return netifaces.ifaddresses('tap0')[netifaces.AF_LINK][0].get('addr')
 
 def parse_link_layer_packet(eth_packet: bytes) -> EthPacket:
 
@@ -87,16 +91,33 @@ def parse_arp_packet(arp_packet: bytes) -> ArpPacket:
     print("opcode:", opcode)
 
     smac = arp_packet[8:14]
-    print("smac:", smac)
+    print("smac:", binascii.hexlify(smac))
 
     sip = arp_packet[14:18]
-    print("sip:", sip)
+    print("sip:", binascii.hexlify(sip))
 
     dmac = arp_packet[18:24]
-    print("dmac:", dmac)
+    print("dmac:", binascii.hexlify(dmac))
 
     dip = arp_packet[24:28]
-    print("dip:", dip)
+    print("dip:", binascii.hexlify(dip))
+
+    return ArpPacket(hwtype, protype, hwsize, prosize, opcode, smac, sip, dmac, dip)
+
+def generate_arp_response(arp_request: ArpPacket) -> ArpPacket:
+    hwtype = arp_request.hwtype
+    protype = arp_request.protype
+    hwsize = arp_request.hwsize
+    prosize = arp_request.prosize
+
+    opcode = int(2).to_bytes(2, 'big')
+    smac_str = getmacddr()
+    print("SMAC:",smac_str)
+    smac = binascii.unhexlify(smac_str.replace(':', '')) 
+    print("SMMMAAAACCC:",binascii.hexlify(smac))
+    sip = arp_request.dip
+    dip = arp_request.sip
+    dmac = arp_request.smac
 
     return ArpPacket(hwtype, protype, hwsize, prosize, opcode, smac, sip, dmac, dip)
 
@@ -116,5 +137,6 @@ while True:
     raw_packet = os.read(ftun, 65535) # we get ftun descriptor by opening /dev/net/tun
     ethpacket = parse_link_layer_packet(raw_packet)
     if ethpacket.ethtype == bytearray.fromhex("0806"):
-        parse_arp_packet(ethpacket.payload)
+        arp_request = parse_arp_packet(ethpacket.payload)
+        arp_response = generate_arp_response(arp_request)
     print(binascii.hexlify(raw_packet))
