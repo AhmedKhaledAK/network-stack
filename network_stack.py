@@ -24,7 +24,7 @@ class ArpPacket(object):
         self.smac = smac
         self.sip = sip
         self.dmac = dmac
-        self.dip = dip(
+        self.dip = dip
 
 
 class IpPacket(object):
@@ -104,7 +104,7 @@ def parse_arp_packet(arp_packet: bytes) -> ArpPacket:
 
     return ArpPacket(hwtype, protype, hwsize, prosize, opcode, smac, sip, dmac, dip)
 
-def generate_arp_response(arp_request: ArpPacket) -> ArpPacket:
+def generate_arp_response(arp_request: ArpPacket):
     hwtype = arp_request.hwtype
     protype = arp_request.protype
     hwsize = arp_request.hwsize
@@ -119,7 +119,7 @@ def generate_arp_response(arp_request: ArpPacket) -> ArpPacket:
     dip = arp_request.sip
     dmac = arp_request.smac
 
-    return ArpPacket(hwtype, protype, hwsize, prosize, opcode, smac, sip, dmac, dip)
+    return hwtype + protype + hwsize.to_bytes(1, 'big') + prosize.to_bytes(1, 'big') + opcode + smac + sip + dmac+dip
 
 subprocess.call(shlex.split("ip link delete tap0"))
 subprocess.call(shlex.split("ip tuntap add mode tap tap0"))
@@ -138,5 +138,5 @@ while True:
     ethpacket = parse_link_layer_packet(raw_packet)
     if ethpacket.ethtype == bytearray.fromhex("0806"):
         arp_request = parse_arp_packet(ethpacket.payload)
-        arp_response = generate_arp_response(arp_request)
+        arp_response_bytes = generate_arp_response(arp_request)
     print(binascii.hexlify(raw_packet))
