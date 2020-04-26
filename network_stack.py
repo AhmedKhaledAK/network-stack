@@ -13,6 +13,19 @@ class EthPacket(object):
         self.payload = payload
 
 
+class ArpPacket(object):
+    def __init__(self, hwtype, protype, hwsize, prosize, opcode, smac, sip, dmac, dip):
+        self.hwtype = hwtype
+        self.protype = protype
+        self.hwsize = hwsize
+        self.prosize = prosize
+        self.opcode = opcode
+        self.smac = smac
+        self.sip = sip
+        self.dmac = dmac
+        self.dip = dip
+
+
 class IpPacket(object):
     """
     Represents the *required* data to be extracted from an IP packet.
@@ -39,7 +52,7 @@ def parse_raw_mac_addr(raw_mac_addr: bytes) -> str:
 def parse_link_layer_packet(eth_packet: bytes) -> EthPacket:
 
     dmac = eth_packet[:6]
-    print("dmac:",binascii.hexlify(dmac));
+    print("dmac:",binascii.hexlify(dmac))
     dmac_str = parse_raw_mac_addr(dmac)
     print("dmac_str:", dmac_str)
 
@@ -51,7 +64,41 @@ def parse_link_layer_packet(eth_packet: bytes) -> EthPacket:
     ethtype = eth_packet[12:14]
     print("ethtype:", binascii.hexlify(ethtype))
 
-    return EthPacket(None, None, None, None)
+    payload = eth_packet[14:]
+    print("payload: ", binascii.hexlify(payload))
+
+    return EthPacket(dmac, smac, ethtype, payload)
+
+def parse_arp_packet(arp_packet: bytes) -> ArpPacket:
+    print("ARP")
+    hwtype = arp_packet[:2]
+    print("hwtype:", hwtype)
+
+    protype = arp_packet[2:4]
+    print("protype:", protype)
+
+    hwsize = arp_packet[4]
+    print("hwsize:", hwsize)
+
+    prosize = arp_packet[5]
+    print("prosize:", prosize)
+
+    opcode = arp_packet[6:8]
+    print("opcode:", opcode)
+
+    smac = arp_packet[8:14]
+    print("smac:", smac)
+
+    sip = arp_packet[14:18]
+    print("sip:", sip)
+
+    dmac = arp_packet[18:24]
+    print("dmac:", dmac)
+
+    dip = arp_packet[24:28]
+    print("dip:", dip)
+
+    return ArpPacket(hwtype, protype, hwsize, prosize, opcode, smac, sip, dmac, dip)
 
 subprocess.call(shlex.split("ip link delete tap0"))
 subprocess.call(shlex.split("ip tuntap add mode tap tap0"))
@@ -68,4 +115,6 @@ ioctl(ftun, TUNSETIFF, struct.pack("16sH", b"tap0", IFF_TAP | IFF_NO_PI))
 while True:
     raw_packet = os.read(ftun, 65535) # we get ftun descriptor by opening /dev/net/tun
     ethpacket = parse_link_layer_packet(raw_packet)
+    if ethpacket.ethtype == bytearray.fromhex("0806"):
+        parse_arp_packet(ethpacket.payload)
     print(binascii.hexlify(raw_packet))
