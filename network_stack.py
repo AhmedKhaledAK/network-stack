@@ -73,6 +73,17 @@ def parse_link_layer_packet(eth_packet: bytes) -> EthPacket:
 
     return EthPacket(dmac, smac, ethtype, payload)
 
+def generate_ethernet_packet(eth_packet: EthPacket):
+    """
+    returns bytes WITHOUT payload
+    """
+    smac_str = getmacddr()
+    smac = binascii.unhexlify(smac_str.replace(':', '')) 
+    dmac = ethpacket.smac
+    ethtype = bytearray.fromhex("0806")
+
+    return dmac + smac + ethtype
+
 def parse_arp_packet(arp_packet: bytes) -> ArpPacket:
     print("ARP")
     hwtype = arp_packet[:2]
@@ -136,7 +147,9 @@ ioctl(ftun, TUNSETIFF, struct.pack("16sH", b"tap0", IFF_TAP | IFF_NO_PI))
 while True:
     raw_packet = os.read(ftun, 65535) # we get ftun descriptor by opening /dev/net/tun
     ethpacket = parse_link_layer_packet(raw_packet)
+    eth_response_bytes = generate_ethernet_packet(ethpacket)
     if ethpacket.ethtype == bytearray.fromhex("0806"):
         arp_request = parse_arp_packet(ethpacket.payload)
         arp_response_bytes = generate_arp_response(arp_request)
+        os.write(ftun, eth_response_bytes + arp_response_bytes)
     print(binascii.hexlify(raw_packet))
