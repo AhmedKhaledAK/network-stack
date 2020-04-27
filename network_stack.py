@@ -13,7 +13,6 @@ class EthPacket(object):
         self.ethtype = ethtype
         self.payload = payload
 
-
 class ArpPacket(object):
     def __init__(self, hwtype, protype, hwsize, prosize, opcode, smac, sip, dmac, dip):
         self.hwtype = hwtype
@@ -38,12 +37,13 @@ class IpPacket(object):
         self.payload = payload
 
 class UdpPacket(object):
-    def _init_(self, sport, dport, length, checksum, data):
+    def __init__(self, sport, dport, length, checksum, data):
         self.sport = sport
         self.dport = sport
         self.length = length
         self.checksum = checksum
         self.data = data
+
 def parse_raw_mac_addr(raw_mac_addr: bytes) -> str:
     mac = ""
     i = 0
@@ -108,7 +108,8 @@ def generate_ethernet_packet(eth_packet: EthPacket):
 def parse_network_layer_packet(ip_packet: bytes) -> IpPacket:
     print("IP IP")
     ihl = ip_packet[0] & 0x0F
-    protocol = ip_packet[9] & 0xFF
+    protocol = ip_packet[9]
+    print("protocol:",protocol)
     srcaddr = parse_raw_ip_addr(ip_packet[12:16])
     destaddr  = parse_raw_ip_addr(ip_packet[16:20])
 
@@ -174,6 +175,17 @@ def generate_arp_response(arp_request: ArpPacket) -> ArpPacket:
 
     return ArpPacket(hwtype, protype, hwsize, prosize, opcode, smac, sip, dmac, dip)
 
+def parse_udp_packet(udp_packet: bytes) -> UdpPacket:
+    print("UDP")
+    sport = udp_packet[:2]
+    dport = udp_packet[2:4]
+    length = udp_packet[4:6]
+    checksum = udp_packet[6:8]
+    data = udp_packet[8:]
+
+
+    return UdpPacket(sport, dport, length, checksum, data)
+
 subprocess.call(shlex.split("ip link delete tap0"))
 subprocess.call(shlex.split("ip tuntap add mode tap tap0"))
 subprocess.call(shlex.split("ip addr add 10.0.0.1/24 dev tap0"))
@@ -197,5 +209,6 @@ while True:
 
     elif ethpacket.ethtype == bytearray.fromhex("0800"):
         ip_packet = parse_network_layer_packet(ethpacket.payload)
-        pass
+        if ip_packet.protocol == 17:
+            udp_packet = parse_udp_packet(ip_packet.payload)
     print(binascii.hexlify(raw_packet))
