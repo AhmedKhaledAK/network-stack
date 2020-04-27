@@ -44,6 +44,14 @@ class UdpPacket(object):
         self.checksum = checksum
         self.data = data
 
+class IcmpPacket(object):
+    def __init__(self, icmp_type, code, checksum, identifier, seqnum):
+        self.icmp_type = icmp_type
+        self.code = code
+        self.checksum = checksum
+        self.identifier = identifier
+        self.seqnum = seqnum
+
 def parse_raw_mac_addr(raw_mac_addr: bytes) -> str:
     mac = ""
     i = 0
@@ -185,6 +193,16 @@ def parse_udp_packet(udp_packet: bytes) -> UdpPacket:
 
 
     return UdpPacket(sport, dport, length, checksum, data)
+
+def parse_icmp_packet(icmp_packet: bytes) -> IcmpPacket:
+    icmp_type = icmp_packet[0]
+    code = icmp_packet[1]
+    checksum = icmp_packet[2:4]
+    identifier = icmp_packet[4:6]
+    seqnum = icmp_packet[6:8]
+
+    return IcmpPacket(icmp_type, code, checksum, identifier, seqnum)
+
 
 subprocess.call(shlex.split("ip link delete tap0"))
 subprocess.call(shlex.split("ip tuntap add mode tap tap0"))
