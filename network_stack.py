@@ -30,10 +30,6 @@ class ArpPacket(object):
         return self.hwtype + self.protype + self.hwsize.to_bytes(1, 'big') + self.prosize.to_bytes(1, 'big') + self.opcode + self.smac + self.sip + self.dmac + self.dip
 
 class IpPacket(object):
-    """
-    Represents the *required* data to be extracted from an IP packet.
-    """
-
     def __init__(self, protocol, ihl, source_address, destination_address, payload):
         self.protocol = protocol
         self.ihl = ihl
@@ -41,6 +37,13 @@ class IpPacket(object):
         self.destination_address = destination_address
         self.payload = payload
 
+class UdpPacket(object):
+    def _init_(self, sport, dport, length, checksum, data):
+        self.sport = sport
+        self.dport = sport
+        self.length = length
+        self.checksum = checksum
+        self.data = data
 def parse_raw_mac_addr(raw_mac_addr: bytes) -> str:
     mac = ""
     i = 0
@@ -51,6 +54,22 @@ def parse_raw_mac_addr(raw_mac_addr: bytes) -> str:
             mac += str(raw_mac_addr[i] & 0xFF) + ":"
         i += 1
     return mac
+
+def parse_raw_ip_addr(raw_ip_addr: bytes) -> str:
+    addr = ""
+    i = 0
+    while i < len(raw_ip_addr):
+        if i == len(raw_ip_addr) - 1:
+            addr+= str(raw_ip_addr[i] & 0xFF)
+        else:
+            addr+= str(raw_ip_addr[i] & 0xFF) + "."
+        i+=1
+
+    return addr
+
+def getdata(offset, packet):
+    start = int(offset*32/8)
+    return packet[start:]
 
 def getmacddr():
     return netifaces.ifaddresses('tap0')[netifaces.AF_LINK][0].get('addr')
@@ -85,6 +104,17 @@ def generate_ethernet_packet(eth_packet: EthPacket):
     ethtype = bytearray.fromhex("0806")
 
     return dmac + smac + ethtype
+
+def parse_network_layer_packet(ip_packet: bytes) -> IpPacket:
+    print("IP IP")
+    ihl = ip_packet[0] & 0x0F
+    protocol = ip_packet[9] & 0xFF
+    srcaddr = parse_raw_ip_addr(ip_packet[12:16])
+    destaddr  = parse_raw_ip_addr(ip_packet[16:20])
+
+    data = getdata(ihl, ip_packet)
+
+    return IpPacket(protocol, ihl, srcaddr, destaddr, data)
 
 def parse_arp_packet(arp_packet: bytes) -> ArpPacket:
     print("ARP")
@@ -164,4 +194,8 @@ while True:
         arp_request = parse_arp_packet(ethpacket.payload)
         arp_response = generate_arp_response(arp_request)
         os.write(ftun, eth_response_bytes + arp_response.arp_to_bytes())
+
+    elif ethpacket.ethtype == bytearray.fromhex("0800"):
+        ip_packet = parse_network_layer_packet(ethpacket.payload)
+        pass
     print(binascii.hexlify(raw_packet))
