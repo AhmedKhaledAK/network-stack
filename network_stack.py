@@ -26,6 +26,8 @@ class ArpPacket(object):
         self.dmac = dmac
         self.dip = dip
 
+    def arp_to_bytes(self):
+        return self.hwtype + self.protype + self.hwsize.to_bytes(1, 'big') + self.prosize.to_bytes(1, 'big') + self.opcode + self.smac + self.sip + self.dmac + self.dip
 
 class IpPacket(object):
     """
@@ -115,7 +117,7 @@ def parse_arp_packet(arp_packet: bytes) -> ArpPacket:
 
     return ArpPacket(hwtype, protype, hwsize, prosize, opcode, smac, sip, dmac, dip)
 
-def generate_arp_response(arp_request: ArpPacket):
+def generate_arp_response(arp_request: ArpPacket) -> ArpPacket:
     hwtype = arp_request.hwtype
     protype = arp_request.protype
     hwsize = arp_request.hwsize
@@ -123,14 +125,24 @@ def generate_arp_response(arp_request: ArpPacket):
 
     opcode = int(2).to_bytes(2, 'big')
     smac_str = getmacddr()
-    print("SMAC:",smac_str)
     smac = binascii.unhexlify(smac_str.replace(':', '')) 
-    print("SMMMAAAACCC:",binascii.hexlify(smac))
     sip = arp_request.dip
-    dip = arp_request.sip
-    dmac = arp_request.smac
 
-    return hwtype + protype + hwsize.to_bytes(1, 'big') + prosize.to_bytes(1, 'big') + opcode + smac + sip + dmac+dip
+    dmac = arp_request.smac
+    dip = arp_request.sip
+
+
+    print(binascii.hexlify(hwtype))
+    print(binascii.hexlify(protype))
+    print(hwsize)
+    print(prosize)
+    print(binascii.hexlify(opcode))
+    print("smac" ,smac)
+    print(binascii.hexlify(sip))
+    print(binascii.hexlify(dmac))
+    print(binascii.hexlify(dip))
+
+    return ArpPacket(hwtype, protype, hwsize, prosize, opcode, smac, sip, dmac, dip)
 
 subprocess.call(shlex.split("ip link delete tap0"))
 subprocess.call(shlex.split("ip tuntap add mode tap tap0"))
@@ -150,6 +162,6 @@ while True:
     eth_response_bytes = generate_ethernet_packet(ethpacket)
     if ethpacket.ethtype == bytearray.fromhex("0806"):
         arp_request = parse_arp_packet(ethpacket.payload)
-        arp_response_bytes = generate_arp_response(arp_request)
-        os.write(ftun, eth_response_bytes + arp_response_bytes)
+        arp_response = generate_arp_response(arp_request)
+        os.write(ftun, eth_response_bytes + arp_response.arp_to_bytes())
     print(binascii.hexlify(raw_packet))
