@@ -296,6 +296,23 @@ def parse_icmp_packet(icmp_packet: bytes) -> IcmpPacket:
 
     return IcmpPacket(icmp_type, code, checksum, identifier, seqnum, data)
 
+def generate_icmp_packet(icmp_request: IcmpPacket) -> IcmpPacket:
+
+    icmp_type = 0
+    icmp_type = icmp_type.to_bytes(1, 'big')
+
+    code = icmp_request.code
+
+    checksum = 0
+    checksum = checksum.to_bytes(2, 'big')
+
+    identifier = icmp_request.identifier
+    seqnum = icmp_request.seqnum
+    data = icmp_request.data
+
+
+    return IcmpPacket(icmp_type, code, checksum, identifier, seqnum, data)
+
 subprocess.call(shlex.split("ip link delete tap0"))
 subprocess.call(shlex.split("ip tuntap add mode tap tap0"))
 subprocess.call(shlex.split("ip addr add 10.0.0.1/24 dev tap0"))
