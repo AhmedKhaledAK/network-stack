@@ -89,6 +89,30 @@ def getdata(offset, packet):
 def getmacddr():
     return netifaces.ifaddresses('tap0')[netifaces.AF_LINK][0].get('addr')
 
+def calculate_checksum(header: bytes):
+    print('*******CALCULATING CHECKSUM*******')
+    print(binascii.hexlify(header))
+
+    sum = 0
+    for i in range(0, len(header), 2):
+        val = struct.unpack('!H', header[i:i+2])[0]
+        print(val)
+        sum += val
+
+    print(sum)
+    print(hex(sum))
+
+    checksum = sum & 0x0FFFF
+    print(checksum)
+
+    if sum & 0x10000 != 0:
+        checksum += 1
+
+    print(checksum)
+    checksum = checksum ^ 0xFFFF
+    print(checksum)
+    return checksum
+
 def parse_link_layer_packet(eth_packet: bytes) -> EthPacket:
 
     dmac = eth_packet[:6]
@@ -132,61 +156,62 @@ def parse_network_layer_packet(ip_packet: bytes) -> IpPacket:
 
     return IpPacket(protocol, ihl, srcaddr, destaddr, data)
 
-def generate_ip_packet(ip_packet: IpPacket, payload_packet):
-
-    packet = b''
-
+def generate_ip_packet(ip_req: IpPacket, payload):
+    header = b''
+    
     version = 0x4
     ihl = 0x5
     f_byte = ((version << 4) | ihl).to_bytes(1, 'big')
-
-    packet += f_byte
+    header += (f_byte)
 
     service_type = 0x1C
+    # service_type = 0x00
     service_type = service_type.to_bytes(1, 'big')
+    header += (service_type)
 
-    packet += service_type
-     
     # header length + udp packet length
-    total_length = 5*4 +len(payload_packet)
+    total_length = 5*4 +len(payload)
     total_length = total_length.to_bytes(2, 'big')
-
-    packet += total_length
+    header += (total_length)
+    
 
     identification = 0
+    # identification = ip_req.identif
     identification = identification.to_bytes(2, 'big')
-
-    packet += identification
+    header += (identification)
 
     flags = 0b010
     frag_offset = 0b0000000000000
     test = ((flags << 13) | frag_offset).to_bytes(2, 'big')
-    
-    packet += test
+    header += (test)
 
     time_to_live = 64
     time_to_live = time_to_live.to_bytes(1, 'big')
-    
-    protocol = ip_packet.protocol
+
+    protocol = ip_req.protocol
     protocol = protocol.to_bytes(1, 'big')
     checksum = 0
     checksum = checksum.to_bytes(2, 'big')
+
+    header += (time_to_live)
+    header += (protocol)
+    header += (checksum)
+
+
+    target_address = ip_req.source_address
+    src_address = ip_req.destination_address
     
-    packet += time_to_live
-    packet += protocol
-    packet += checksum
+    header+=(src_address)
+    header+=(target_address)
+    
+    checksum = calculate_checksum(header)
+    checksum = checksum.to_bytes(2, 'big')
 
-    target_address = ip_packet.source_address
-    src_address = ip_packet.destination_address
+    ip_response = (f_byte + service_type + total_length + identification 
+                    + test + time_to_live + protocol + checksum + src_address 
+                    + target_address + payload)
 
-    packet += src_address
-    packet += target_address
-
-    payload = payload_packet
-
-    packet += payload
-
-    return packet
+    return ip_response
 
 def parse_arp_packet(arp_packet: bytes) -> ArpPacket:
     print("ARP")
