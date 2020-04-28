@@ -44,6 +44,9 @@ class UdpPacket(object):
         self.checksum = checksum
         self.data = data
 
+    def udp_to_bytes(self):
+        return (self.sport + self.dport + self.length + self.checksum + self.data)
+
 class IcmpPacket(object):
     def __init__(self, icmp_type, code, checksum, identifier, seqnum, data):
         self.icmp_type = icmp_type
