@@ -56,6 +56,9 @@ class IcmpPacket(object):
         self.seqnum = seqnum
         self.data = data
 
+    def icmp_to_bytes(self):
+        return (self.icmp_type + self.code + self.checksum + self.identifier + self.seqnum + self.data)
+
 def parse_raw_mac_addr(raw_mac_addr: bytes) -> str:
     mac = ""
     i = 0
@@ -185,7 +188,6 @@ def generate_ip_packet(ip_packet: IpPacket, payload_packet):
 
     return packet
 
-
 def parse_arp_packet(arp_packet: bytes) -> ArpPacket:
     print("ARP")
     hwtype = arp_packet[:2]
@@ -301,7 +303,7 @@ def generate_icmp_packet(icmp_request: IcmpPacket) -> IcmpPacket:
     icmp_type = 0
     icmp_type = icmp_type.to_bytes(1, 'big')
 
-    code = icmp_request.code
+    code = icmp_request.code.to_bytes(1, 'big')
 
     checksum = 0
     checksum = checksum.to_bytes(2, 'big')
@@ -344,4 +346,7 @@ while True:
             os.write(ftun, eth_response_bytes + ip_response)
         elif ip_packet.protocol == 1:
             icmp_packet = parse_icmp_packet(ip_packet.payload)
+            icmp_reply = generate_icmp_packet(icmp_packet)
+            ip_response = generate_ip_packet(ip_packet, icmp_reply.icmp_to_bytes())
+            os.write(ftun, eth_response_bytes + ip_response)
     print(binascii.hexlify(raw_packet))
