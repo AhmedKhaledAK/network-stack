@@ -39,7 +39,7 @@ class IpPacket(object):
 class UdpPacket(object):
     def __init__(self, sport, dport, length, checksum, data):
         self.sport = sport
-        self.dport = sport
+        self.dport = dport
         self.length = length
         self.checksum = checksum
         self.data = data
@@ -112,8 +112,8 @@ def generate_ethernet_packet(eth_packet: EthPacket):
     """
     smac_str = getmacddr()
     smac = binascii.unhexlify(smac_str.replace(':', '')) 
-    dmac = ethpacket.smac
-    ethtype = bytearray.fromhex("0806")
+    dmac = eth_packet.smac
+    ethtype = eth_packet.ethtype
 
     return dmac + smac + ethtype
 
@@ -122,12 +122,69 @@ def parse_network_layer_packet(ip_packet: bytes) -> IpPacket:
     ihl = ip_packet[0] & 0x0F
     protocol = ip_packet[9]
     print("protocol:",protocol)
-    srcaddr = parse_raw_ip_addr(ip_packet[12:16])
-    destaddr  = parse_raw_ip_addr(ip_packet[16:20])
+    srcaddr = (ip_packet[12:16])
+    destaddr  = (ip_packet[16:20])
 
     data = getdata(ihl, ip_packet)
 
     return IpPacket(protocol, ihl, srcaddr, destaddr, data)
+
+def generate_ip_packet(ip_packet: IpPacket, payload_packet):
+
+    packet = b''
+
+    version = 0x4
+    ihl = 0x5
+    f_byte = ((version << 4) | ihl).to_bytes(1, 'big')
+
+    packet += f_byte
+
+    service_type = 0x1C
+    service_type = service_type.to_bytes(1, 'big')
+
+    packet += service_type
+     
+    # header length + udp packet length
+    total_length = 5*4 +len(payload_packet)
+    total_length = total_length.to_bytes(2, 'big')
+
+    packet += total_length
+
+    identification = 0
+    identification = identification.to_bytes(2, 'big')
+
+    packet += identification
+
+    flags = 0b010
+    frag_offset = 0b0000000000000
+    test = ((flags << 13) | frag_offset).to_bytes(2, 'big')
+    
+    packet += test
+
+    time_to_live = 64
+    time_to_live = time_to_live.to_bytes(1, 'big')
+    
+    protocol = ip_packet.protocol
+    protocol = protocol.to_bytes(1, 'big')
+    checksum = 0
+    checksum = checksum.to_bytes(2, 'big')
+    
+    packet += time_to_live
+    packet += protocol
+    packet += checksum
+
+    target_address = ip_packet.source_address
+    src_address = ip_packet.destination_address
+
+    packet += src_address
+    packet += target_address
+
+    payload = payload_packet
+
+    packet += payload
+
+    return packet
+
 
 def parse_arp_packet(arp_packet: bytes) -> ArpPacket:
     print("ARP")
@@ -198,6 +255,10 @@ def parse_udp_packet(udp_packet: bytes) -> UdpPacket:
     return UdpPacket(sport, dport, length, checksum, data)
 
 def generate_udp_packet(udp_packet: UdpPacket) -> UdpPacket:
+
+    print("SRC_PORT:", udp_packet.sport)
+    print("DEST_PORT:", udp_packet.dport)
+
     dest_port = udp_packet.sport
     print("destport: ", dest_port)
 
@@ -261,6 +322,9 @@ while True:
         print("PROTOCOL:", ip_packet.protocol)
         if ip_packet.protocol == 17:
             udp_packet = parse_udp_packet(ip_packet.payload)
+            udp_response = generate_udp_packet(udp_packet)
+            ip_response = generate_ip_packet(ip_packet, udp_response.udp_to_bytes())
+            os.write(ftun, eth_response_bytes + ip_response)
         elif ip_packet.protocol == 1:
             icmp_packet = parse_icmp_packet(ip_packet.payload)
     print(binascii.hexlify(raw_packet))
