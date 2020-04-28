@@ -45,12 +45,13 @@ class UdpPacket(object):
         self.data = data
 
 class IcmpPacket(object):
-    def __init__(self, icmp_type, code, checksum, identifier, seqnum):
+    def __init__(self, icmp_type, code, checksum, identifier, seqnum, data):
         self.icmp_type = icmp_type
         self.code = code
         self.checksum = checksum
         self.identifier = identifier
         self.seqnum = seqnum
+        self.data = data
 
 def parse_raw_mac_addr(raw_mac_addr: bytes) -> str:
     mac = ""
@@ -191,18 +192,45 @@ def parse_udp_packet(udp_packet: bytes) -> UdpPacket:
     checksum = udp_packet[6:8]
     data = udp_packet[8:]
 
-
     return UdpPacket(sport, dport, length, checksum, data)
 
+def generate_udp_packet(udp_packet: UdpPacket) -> UdpPacket:
+    dest_port = udp_packet.sport
+    print("destport: ", dest_port)
+
+    src_port = udp_packet.dport
+    print("srcport: ", src_port)
+    
+    data = udp_packet.data
+    print("message: ", data)
+    
+    checksum = 0
+    checksum = checksum.to_bytes(2, 'big')
+    print("checksum: ", checksum)
+    
+    length = (8 + len(data)).to_bytes(2, 'big')
+    print("length: ", length)
+
+    return UdpPacket(src_port, dest_port, length, checksum, data)
+
 def parse_icmp_packet(icmp_packet: bytes) -> IcmpPacket:
+
     icmp_type = icmp_packet[0]
     code = icmp_packet[1]
     checksum = icmp_packet[2:4]
     identifier = icmp_packet[4:6]
     seqnum = icmp_packet[6:8]
+    data = icmp_packet[8:]
+    
+    print("******TESTING ICMP******")
+    print(icmp_type)
+    print(code)
+    print(binascii.hexlify(checksum))
+    print(binascii.hexlify(identifier))
+    print(binascii.hexlify(seqnum))
+    print(binascii.hexlify(data))
 
-    return IcmpPacket(icmp_type, code, checksum, identifier, seqnum)
-
+    return IcmpPacket(icmp_type, code, checksum, identifier, seqnum, data)
 
 subprocess.call(shlex.split("ip link delete tap0"))
 subprocess.call(shlex.split("ip tuntap add mode tap tap0"))
@@ -227,6 +255,9 @@ while True:
 
     elif ethpacket.ethtype == bytearray.fromhex("0800"):
         ip_packet = parse_network_layer_packet(ethpacket.payload)
+        print("PROTOCOL:", ip_packet.protocol)
         if ip_packet.protocol == 17:
             udp_packet = parse_udp_packet(ip_packet.payload)
+        elif ip_packet.protocol == 1:
+            icmp_packet = parse_icmp_packet(ip_packet.payload)
     print(binascii.hexlify(raw_packet))
