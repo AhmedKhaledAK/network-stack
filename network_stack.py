@@ -107,7 +107,7 @@ def calculate_checksum(header: bytes):
 
     if sum & 0x10000 != 0:
         checksum += 1
-
+    
     print(checksum)
     checksum = checksum ^ 0xFFFF
     print(checksum)
@@ -325,18 +325,33 @@ def parse_icmp_packet(icmp_packet: bytes) -> IcmpPacket:
 
 def generate_icmp_packet(icmp_request: IcmpPacket) -> IcmpPacket:
 
+    header = b''
+
     icmp_type = 0
     icmp_type = icmp_type.to_bytes(1, 'big')
 
+    header += icmp_type
+
     code = icmp_request.code.to_bytes(1, 'big')
+
+    header += code
 
     checksum = 0
     checksum = checksum.to_bytes(2, 'big')
+
+    header += checksum
 
     identifier = icmp_request.identifier
     seqnum = icmp_request.seqnum
     data = icmp_request.data
 
+    header += identifier
+    header += seqnum
+    header += data
+
+    checksum = calculate_checksum(header)
+    #checksum -= 4
+    checksum = checksum.to_bytes(2, 'big')
 
     return IcmpPacket(icmp_type, code, checksum, identifier, seqnum, data)
 
