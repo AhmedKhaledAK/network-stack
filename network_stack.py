@@ -105,9 +105,10 @@ def calculate_checksum(header: bytes):
     checksum = sum & 0x0FFFF
     print(checksum)
 
-    if sum & 0x10000 != 0:
-        checksum += 1
-    
+    if sum & 0xF0000 != 0:
+        x = (int((sum&0xF0000) / (4096*16)))
+        checksum += x
+
     print(checksum)
     checksum = checksum ^ 0xFFFF
     print(checksum)
